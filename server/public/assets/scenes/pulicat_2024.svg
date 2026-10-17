@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <defs>
+    <linearGradient id="wetlandWaterGrad2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0c4a6e"/>
+      <stop offset="50%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+    <linearGradient id="marshGrad2" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#14532d"/>
+      <stop offset="100%" stop-color="#166534"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Coastal Land / Marsh -->
+  <rect width="800" height="600" fill="url(#marshGrad2)"/>
+  
+  <!-- Pulicat Lagoon Waterbody - Shrunken Extent -->
+  <path d="M 220 50 Q 250 220 230 420 T 320 600 L 710 600 Q 670 380 730 180 L 730 50 Z" fill="url(#wetlandWaterGrad2)"/>
+  <!-- Exposed dried mudflats (Altered area) -->
+  <path d="M 120 0 L 220 50 L 230 420 L 150 400 Z" fill="#78350f" opacity="0.6"/>
+  <!-- Unauthorized aquaculture enclosures (geometric bunds) -->
+  <rect x="250" y="320" width="70" height="50" fill="#0f766e" stroke="#f59e0b" stroke-width="2"/>
+  <rect x="330" y="330" width="60" height="40" fill="#0f766e" stroke="#f59e0b" stroke-width="2"/>
+  <rect x="260" y="380" width="80" height="45" fill="#0f766e" stroke="#f59e0b" stroke-width="2"/>
+  
+  <!-- Label badge -->
+  <rect x="20" y="20" width="370" height="40" rx="8" fill="#000" fill-opacity="0.75"/>
+  <text x="35" y="46" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#f59e0b">PREPARED DEMO • 2024-01-15 • HYDROLOGIC DRYDOWN</text>
+</svg>

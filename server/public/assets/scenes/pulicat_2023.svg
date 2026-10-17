@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <defs>
+    <linearGradient id="wetlandWaterGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0c4a6e"/>
+      <stop offset="50%" stop-color="#0284c7"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+    <linearGradient id="marshGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#14532d"/>
+      <stop offset="100%" stop-color="#166534"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Coastal Land / Marsh -->
+  <rect width="800" height="600" fill="url(#marshGrad)"/>
+  
+  <!-- Pulicat Lagoon Waterbody - Baseline High Tide Extent -->
+  <path d="M 120 0 Q 180 200 150 400 T 260 600 L 750 600 Q 700 350 780 150 L 780 0 Z" fill="url(#wetlandWaterGrad)"/>
+  <!-- Sand spit / Barrier island -->
+  <path d="M 720 0 L 760 0 L 750 600 L 710 600 Z" fill="#e2e8f0" opacity="0.6"/>
+  <!-- Mudflats and marsh vegetation patches -->
+  <ellipse cx="280" cy="220" rx="40" ry="25" fill="#15803d" opacity="0.8"/>
+  <ellipse cx="450" cy="380" rx="60" ry="35" fill="#15803d" opacity="0.8"/>
+  
+  <!-- Label badge -->
+  <rect x="20" y="20" width="370" height="40" rx="8" fill="#000" fill-opacity="0.75"/>
+  <text x="35" y="46" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#38bdf8">SENTINEL-2 RGB • 2023-01-10 • WETLAND BASELINE</text>
+</svg>
