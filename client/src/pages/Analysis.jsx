@@ -1,31 +1,29 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Layers,
   Calendar,
   AlertTriangle,
-  ShieldAlert,
   ClipboardPlus,
-  Info,
   CheckCircle2,
   Sparkles,
-  ArrowRight,
   Eye,
+  EyeOff,
   Sliders,
-  Maximize2,
-  Cloud,
   Satellite,
   Compass,
   ArrowLeftRight,
   ChevronDown,
-  Image as ImageIcon
+  ChevronUp,
+  FileText,
+  ShieldCheck,
+  Check
 } from 'lucide-react';
 import {
   getAreas,
-  getArea,
   getAreaScenes,
   getAnalyses,
   getAnalysis,
+  createAnalysis,
   getProtectedZones,
   createInspection
 } from '../api';
@@ -33,7 +31,8 @@ import StatusBadge from '../components/StatusBadge';
 import LoadingState from '../components/LoadingState';
 import ErrorMessage from '../components/ErrorMessage';
 import EmptyState from '../components/EmptyState';
-import MapView from '../components/MapView';
+import MapView, { extractBoundsFromGeoJson } from '../components/MapView';
+import BeforeAfterSlider from '../components/BeforeAfterSlider';
 
 export default function Analysis() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -45,12 +44,19 @@ export default function Analysis() {
   const [analysis, setAnalysis] = useState(null);
   const [protectedZones, setProtectedZones] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [comparing, setComparing] = useState(false);
   const [error, setError] = useState(null);
 
-  // UI view toggles
+  // Chunk 2: View & Toggle States
   const [showMask, setShowMask] = useState(true);
-  const [sliderPosition, setSliderPosition] = useState(50); // percentage for before/after comparison
+  const [maskOpacity, setMaskOpacity] = useState(0.85);
   const [activeTab, setActiveTab] = useState('slider'); // 'slider' | 'map' | 'scenes'
+  const [showQualityDetails, setShowQualityDetails] = useState(true);
+
+  // Map Overlay controls
+  const [showMapOverlay, setShowMapOverlay] = useState(true);
+  const [mapOverlayType, setMapOverlayType] = useState('mask'); // 'mask' | 'scene'
+  const [mapOverlayOpacity, setMapOverlayOpacity] = useState(0.75);
 
   // Inspection Task Modal
   const [inspectModalOpen, setInspectModalOpen] = useState(false);
@@ -63,6 +69,48 @@ export default function Analysis() {
   });
   const [taskSubmitting, setTaskSubmitting] = useState(false);
   const [taskSuccessMessage, setTaskSuccessMessage] = useState('');
+
+  const loadAreaScenesAndAnalysis = useCallback(async (areaId, existingAnalyses = []) => {
+    try {
+      // 1. Fetch scenes for this specific monitoring area
+      const scenesRes = await getAreaScenes(areaId);
+      const loadedScenes = scenesRes.scenes || [];
+      setScenes(loadedScenes);
+
+      let initialEarlierId = '';
+      let initialLaterId = '';
+
+      if (loadedScenes.length >= 2) {
+        initialEarlierId = loadedScenes[0]._id;
+        initialLaterId = loadedScenes[loadedScenes.length - 1]._id;
+      } else if (loadedScenes.length === 1) {
+        initialEarlierId = loadedScenes[0]._id;
+      }
+
+      setEarlierSceneId(initialEarlierId);
+      setLaterSceneId(initialLaterId);
+
+      // 2. Find matching analysis for this area
+      const matchingAnalysis = existingAnalyses.find(
+        (a) => (a.monitoringArea?._id || a.monitoringArea) === areaId
+      );
+
+      if (matchingAnalysis) {
+        const fullAnalysisRes = await getAnalysis(matchingAnalysis._id);
+        setAnalysis(fullAnalysisRes.analysis);
+      } else {
+        const analysesForArea = await getAnalyses({ areaId });
+        if (analysesForArea.analyses?.length > 0) {
+          const fullAnalysisRes = await getAnalysis(analysesForArea.analyses[0]._id);
+          setAnalysis(fullAnalysisRes.analysis);
+        } else {
+          setAnalysis(null);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load area scenes/analysis:', err);
+    }
+  }, []);
 
   // Initial load
   useEffect(() => {
@@ -81,9 +129,10 @@ export default function Analysis() {
         setAreas(loadedAreas);
         setProtectedZones(zonesRes.protectedZones || []);
 
-        // Pick requested area or first available
+        // Pick requested area from URL or first available
         const queryAreaId = searchParams.get('areaId');
-        const defaultArea = (queryAreaId && loadedAreas.find(a => a._id === queryAreaId)) || loadedAreas[0];
+        const defaultArea =
+          (queryAreaId && loadedAreas.find((a) => a._id === queryAreaId)) || loadedAreas[0];
 
         if (defaultArea) {
           setSelectedAreaId(defaultArea._id);
@@ -98,48 +147,7 @@ export default function Analysis() {
     };
 
     init();
-  }, [searchParams]);
-
-  const loadAreaScenesAndAnalysis = async (areaId, existingAnalyses = []) => {
-    try {
-      // 1. Fetch scenes for this specific monitoring area
-      const scenesRes = await getAreaScenes(areaId);
-      const loadedScenes = scenesRes.scenes || [];
-      setScenes(loadedScenes);
-
-      // 2. Select initial earlier and later scenes if available
-      if (loadedScenes.length >= 2) {
-        setEarlierSceneId(loadedScenes[0]._id);
-        setLaterSceneId(loadedScenes[loadedScenes.length - 1]._id);
-      } else if (loadedScenes.length === 1) {
-        setEarlierSceneId(loadedScenes[0]._id);
-        setLaterSceneId('');
-      } else {
-        setEarlierSceneId('');
-        setLaterSceneId('');
-      }
-
-      // 3. Find matching analysis for this area
-      const matchingAnalysis = existingAnalyses.find(
-        a => (a.monitoringArea?._id || a.monitoringArea) === areaId
-      );
-
-      if (matchingAnalysis) {
-        const fullAnalysisRes = await getAnalysis(matchingAnalysis._id);
-        setAnalysis(fullAnalysisRes.analysis);
-      } else {
-        const analysesForArea = await getAnalyses({ areaId });
-        if (analysesForArea.analyses?.length > 0) {
-          const fullAnalysisRes = await getAnalysis(analysesForArea.analyses[0]._id);
-          setAnalysis(fullAnalysisRes.analysis);
-        } else {
-          setAnalysis(null);
-        }
-      }
-    } catch (err) {
-      console.error('Failed to load area scenes/analysis:', err);
-    }
-  };
+  }, [searchParams, loadAreaScenesAndAnalysis]);
 
   const handleAreaChange = async (e) => {
     const newAreaId = e.target.value;
@@ -157,11 +165,44 @@ export default function Analysis() {
     setLaterSceneId(temp);
   };
 
+  // Run or refresh image comparison
+  const handleRunComparison = async () => {
+    if (!selectedAreaId || !earlierSceneId || !laterSceneId) return;
+    if (earlierSceneId === laterSceneId) {
+      alert('T1 Baseline and T2 Comparison must be distinct acquisition dates.');
+      return;
+    }
+
+    try {
+      setComparing(true);
+      setError(null);
+      const res = await createAnalysis({
+        areaId: selectedAreaId,
+        earlierSceneId,
+        laterSceneId,
+        method: 'PREPARED_RESULT'
+      });
+
+      if (res.analysis) {
+        setAnalysis(res.analysis);
+      }
+    } catch (err) {
+      console.error('Comparison execution failed:', err);
+      setError(err.message || 'Failed to compare satellite scenes.');
+    } finally {
+      setComparing(false);
+    }
+  };
+
   const handleOpenTaskModal = (region) => {
     setSelectedRegion(region);
     setTaskForm({
       title: `Field Inspection: ${region.category.replace('_', ' ')} (${region.regionId})`,
-      description: `Automated detection detected ${(region.areaSqMeters / 10000).toFixed(2)} ha anomaly. Overlaps protected reserve: ${region.protectedZoneOverlap ? 'YES' : 'NO'}. Field perimeter verification requested.`,
+      description: `Spectral anomaly detected ${(region.areaSqMeters / 10000).toFixed(
+        2
+      )} ha area. Overlaps protected reserve: ${
+        region.protectedZoneOverlap ? 'YES' : 'NO'
+      }. On-site boundary verification requested.`,
       priority: region.protectedZoneOverlap ? 'HIGH' : 'MEDIUM',
       assignedTo: 'Officer P. Deshmukh'
     });
@@ -196,17 +237,35 @@ export default function Analysis() {
     }
   };
 
-  if (loading) return <LoadingState message="Cataloging satellite passes and multi-temporal scenes..." />;
-  if (error) return <ErrorMessage message={error} />;
-
-  const currentArea = areas.find(a => a._id === selectedAreaId);
-  const earlierScene = scenes.find(s => s._id === earlierSceneId);
-  const laterScene = scenes.find(s => s._id === laterSceneId);
+  const currentArea = areas.find((a) => a._id === selectedAreaId);
+  const earlierScene = scenes.find((s) => s._id === earlierSceneId);
+  const laterScene = scenes.find((s) => s._id === laterSceneId);
 
   // Validation checks for scenes
   const hasScenes = scenes.length > 0;
   const isSameSceneSelected = earlierSceneId && laterSceneId && earlierSceneId === laterSceneId;
   const hasEnoughScenes = scenes.length >= 2;
+
+  // Geographic bounds for map overlay
+  const geographicBounds = useMemo(() => {
+    return earlierScene?.bounds || currentArea?.boundary || null;
+  }, [earlierScene, currentArea]);
+
+  const leafletBounds = useMemo(() => {
+    return extractBoundsFromGeoJson(geographicBounds);
+  }, [geographicBounds]);
+
+  // Elapsed time calculation
+  const elapsedDays = useMemo(() => {
+    if (!earlierScene?.acquisitionDate || !laterScene?.acquisitionDate) return null;
+    const d1 = new Date(earlierScene.acquisitionDate).getTime();
+    const d2 = new Date(laterScene.acquisitionDate).getTime();
+    const diffDays = Math.round(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
+    return diffDays;
+  }, [earlierScene, laterScene]);
+
+  if (loading) return <LoadingState message="Cataloging satellite passes and multi-temporal scenes..." />;
+  if (error) return <ErrorMessage message={error} />;
 
   return (
     <div className="space-y-6">
@@ -219,11 +278,11 @@ export default function Analysis() {
                 Satellite Scene Catalog & Change Analysis
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                Chunk 1: Scene Ingestion & Alignment
+                Chunk 2: Before/After Comparison
               </span>
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              Select an area of interest, choose acquisition dates from the multi-temporal scene catalog, and inspect aligned imagery.
+              Interactive multi-temporal before/after split slider, change-mask overlay, and georeferenced raster projection.
             </p>
           </div>
 
@@ -239,7 +298,7 @@ export default function Analysis() {
                 onChange={handleAreaChange}
                 className="text-xs font-medium rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs"
               >
-                {areas.map(a => (
+                {areas.map((a) => (
                   <option key={a._id} value={a._id}>
                     {a.name} ({a.scenesCount || 0} scenes)
                   </option>
@@ -289,13 +348,16 @@ export default function Analysis() {
           </div>
         </div>
 
-        {/* 2. Date Selectors & Validation Controls */}
+        {/* 2. Date Selectors & Comparison Action Controls */}
         {hasScenes ? (
           <div className="mt-4 pt-4 border-t border-slate-100">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
               {/* Earlier Date (T1) */}
-              <div className="md:col-span-5 p-3 rounded-lg bg-slate-50 border border-slate-200/80">
-                <label htmlFor="earlier-scene-select" className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <div className="md:col-span-4 p-3 rounded-lg bg-slate-50 border border-slate-200/80">
+                <label
+                  htmlFor="earlier-scene-select"
+                  className="block text-[10px] font-bold text-slate-600 uppercase tracking-wider mb-1 flex items-center justify-between"
+                >
                   <span>Earlier Scene (T1 Baseline)</span>
                   {earlierScene && <StatusBadge status={earlierScene.source} />}
                 </label>
@@ -309,30 +371,58 @@ export default function Analysis() {
                   >
                     {scenes.map((s) => (
                       <option key={`earlier-${s._id}`} value={s._id}>
-                        {new Date(s.acquisitionDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} • {s.source === 'SENTINEL_2' ? 'Sentinel-2' : 'Prepared Demo'} ({s.cloudCoverPercent || 0}% cloud)
+                        {new Date(s.acquisitionDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })}{' '}
+                        • {s.source === 'SENTINEL_2' ? 'Sentinel-2' : 'Prepared Demo'} ({s.cloudCoverPercent || 0}% cloud)
                       </option>
                     ))}
                   </select>
                 </div>
               </div>
 
-              {/* Swap Dates Button */}
-              <div className="md:col-span-2 flex justify-center">
+              {/* Swap Dates & Compare Action Button */}
+              <div className="md:col-span-4 flex items-center justify-center gap-2">
                 <button
                   type="button"
                   id="btn-swap-dates"
                   onClick={handleSwapDates}
                   title="Swap T1 and T2 acquisition dates"
                   disabled={!earlierSceneId || !laterSceneId}
-                  className="p-2 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 shadow-xs hover:border-emerald-300 disabled:opacity-40 transition-all"
+                  className="p-2.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 shadow-xs hover:border-emerald-300 disabled:opacity-40 transition-all"
                 >
                   <ArrowLeftRight className="w-4 h-4" />
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-run-comparison"
+                  onClick={handleRunComparison}
+                  disabled={comparing || isSameSceneSelected || !earlierSceneId || !laterSceneId}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs hover:shadow-sm disabled:opacity-50 transition-all"
+                >
+                  {comparing ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      <span>Aligning Imagery...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sliders className="w-4 h-4" />
+                      <span>Compare Images</span>
+                    </>
+                  )}
                 </button>
               </div>
 
               {/* Later Date (T2) */}
-              <div className="md:col-span-5 p-3 rounded-lg bg-emerald-50/50 border border-emerald-200/80">
-                <label htmlFor="later-scene-select" className="block text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <div className="md:col-span-4 p-3 rounded-lg bg-emerald-50/50 border border-emerald-200/80">
+                <label
+                  htmlFor="later-scene-select"
+                  className="block text-[10px] font-bold text-emerald-800 uppercase tracking-wider mb-1 flex items-center justify-between"
+                >
                   <span>Later Scene (T2 Current)</span>
                   {laterScene && <StatusBadge status={laterScene.source} />}
                 </label>
@@ -346,7 +436,12 @@ export default function Analysis() {
                   >
                     {scenes.map((s) => (
                       <option key={`later-${s._id}`} value={s._id}>
-                        {new Date(s.acquisitionDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} • {s.source === 'SENTINEL_2' ? 'Sentinel-2' : 'Prepared Demo'} ({s.cloudCoverPercent || 0}% cloud)
+                        {new Date(s.acquisitionDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        })}{' '}
+                        • {s.source === 'SENTINEL_2' ? 'Sentinel-2' : 'Prepared Demo'} ({s.cloudCoverPercent || 0}% cloud)
                       </option>
                     ))}
                   </select>
@@ -376,7 +471,7 @@ export default function Analysis() {
             icon={Satellite}
             actionLabel="Switch to Western Ghats Sector 4 (Active)"
             onAction={() => {
-              const defaultA = areas.find(a => a.name.includes('Western Ghats')) || areas[0];
+              const defaultA = areas.find((a) => a.name.includes('Western Ghats')) || areas[0];
               if (defaultA) {
                 setSelectedAreaId(defaultA._id);
                 setSearchParams({ areaId: defaultA._id });
@@ -399,154 +494,17 @@ export default function Analysis() {
         </div>
       ) : (
         <>
-          {/* 4. Side-by-Side Scene Preview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Earlier Scene (T1) Preview Card */}
-            <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-md bg-slate-100 flex items-center justify-center text-slate-700 font-bold text-xs">
-                    T1
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900">
-                      Earlier Scene (Baseline)
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      {earlierScene?.acquisitionDate ? new Date(earlierScene.acquisitionDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'No date'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Visible Source Badge */}
-                {earlierScene && (
-                  <div className="flex items-center gap-1.5">
-                    {earlierScene.source === 'SENTINEL_2' ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
-                        <Satellite className="w-3.5 h-3.5 text-teal-600" />
-                        Verified Sentinel-2 RGB
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                        Prepared Demo Dataset
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Image Thumbnail Preview */}
-              <div className="relative aspect-video rounded-lg overflow-hidden border border-slate-200 bg-slate-900 mb-3 group">
-                <img
-                  src={earlierScene?.imageUrl || 'http://localhost:5000/assets/scenes/wg_2023.svg'}
-                  alt="Earlier satellite scene preview"
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                />
-                <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur-xs text-white text-[10px] font-mono">
-                  {earlierScene?.resolutionMeters || 10}m Ground Sample Distance
-                </div>
-              </div>
-
-              {/* Scene Metadata Bar */}
-              <div className="pt-2.5 border-t border-slate-100 grid grid-cols-3 gap-2 text-center text-xs">
-                <div>
-                  <span className="text-[10px] text-slate-600 block">Cloud Cover</span>
-                  <span className="font-semibold text-slate-800 flex items-center justify-center gap-1">
-                    <Cloud className="w-3 h-3 text-slate-400" />
-                    {earlierScene?.cloudCoverPercent ?? 0}%
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-600 block">Resolution</span>
-                  <span className="font-semibold text-slate-800">{earlierScene?.resolutionMeters || 10}m / px</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-600 block">Status</span>
-                  <span className="font-semibold text-emerald-800">{earlierScene?.processingStatus || 'READY'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Later Scene (T2) Preview Card */}
-            <div className="bg-white rounded-xl border border-slate-200/80 p-4 shadow-xs flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-md bg-emerald-100 flex items-center justify-center text-emerald-800 font-bold text-xs">
-                    T2
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-bold text-slate-900">
-                      Later Scene (Current)
-                    </h3>
-                    <p className="text-[11px] text-slate-500">
-                      {laterScene?.acquisitionDate ? new Date(laterScene.acquisitionDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'No date'}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Visible Source Badge */}
-                {laterScene && (
-                  <div className="flex items-center gap-1.5">
-                    {laterScene.source === 'SENTINEL_2' ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
-                        <Satellite className="w-3.5 h-3.5 text-teal-600" />
-                        Verified Sentinel-2 RGB
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200">
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                        Prepared Demo Dataset
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* Image Thumbnail Preview */}
-              <div className="relative aspect-video rounded-lg overflow-hidden border border-slate-200 bg-slate-900 mb-3 group">
-                <img
-                  src={laterScene?.imageUrl || 'http://localhost:5000/assets/scenes/wg_2024.svg'}
-                  alt="Later satellite scene preview"
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                />
-                <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/70 backdrop-blur-xs text-white text-[10px] font-mono">
-                  {laterScene?.resolutionMeters || 10}m Ground Sample Distance
-                </div>
-              </div>
-
-              {/* Scene Metadata Bar */}
-              <div className="pt-2.5 border-t border-slate-100 grid grid-cols-3 gap-2 text-center text-xs">
-                <div>
-                  <span className="text-[10px] text-slate-600 block">Cloud Cover</span>
-                  <span className="font-semibold text-slate-800 flex items-center justify-center gap-1">
-                    <Cloud className="w-3 h-3 text-slate-400" />
-                    {laterScene?.cloudCoverPercent ?? 0}%
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-600 block">Resolution</span>
-                  <span className="font-semibold text-slate-800">{laterScene?.resolutionMeters || 10}m / px</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-600 block">Status</span>
-                  <span className="font-semibold text-emerald-800">{laterScene?.processingStatus || 'READY'}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 5. Main Comparison Stage */}
+          {/* 4. MAIN COMPARISON STAGE */}
           {activeTab === 'scenes' ? (
             /* Scene Catalog Table */
             <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <h2 className="text-sm font-bold text-slate-900">
-                    Scene Catalog for {currentArea?.name}
+                    Multi-Temporal Scene Catalog for {currentArea?.name}
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Chronological satellite acquisitions available for multi-temporal alignment.
+                    Chronological satellite acquisitions available for multi-temporal alignment and change verification.
                   </p>
                 </div>
                 <span className="text-xs font-semibold px-2.5 py-1 rounded bg-slate-100 text-slate-700">
@@ -563,7 +521,7 @@ export default function Analysis() {
                       <th className="py-3 px-4">Data Source</th>
                       <th className="py-3 px-4">Cloud Cover</th>
                       <th className="py-3 px-4">Resolution</th>
-                      <th className="py-3 px-4 text-right">Set As</th>
+                      <th className="py-3 px-4 text-right">Assign Pass</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -577,39 +535,45 @@ export default function Analysis() {
                           />
                         </td>
                         <td className="py-2.5 px-4 font-bold text-slate-900">
-                          {new Date(scene.acquisitionDate).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                          {new Date(scene.acquisitionDate).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
                         </td>
                         <td className="py-2.5 px-4">
                           <StatusBadge status={scene.source} />
                         </td>
-                        <td className="py-2.5 px-4 font-mono">
-                          {scene.cloudCoverPercent}%
-                        </td>
-                        <td className="py-2.5 px-4">
-                          {scene.resolutionMeters}m
-                        </td>
+                        <td className="py-2.5 px-4 font-mono">{scene.cloudCoverPercent}%</td>
+                        <td className="py-2.5 px-4">{scene.resolutionMeters}m</td>
                         <td className="py-2.5 px-4 text-right space-x-1.5">
                           <button
                             type="button"
-                            onClick={() => { setEarlierSceneId(scene._id); setActiveTab('slider'); }}
-                            className={`px-2 py-1 rounded text-[11px] font-semibold border ${
+                            onClick={() => {
+                              setEarlierSceneId(scene._id);
+                              setActiveTab('slider');
+                            }}
+                            className={`px-2.5 py-1 rounded text-[11px] font-semibold border ${
                               earlierSceneId === scene._id
-                                ? 'bg-slate-800 text-white border-slate-800'
+                                ? 'bg-slate-900 text-white border-slate-900'
                                 : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                             }`}
                           >
-                            Set T1
+                            Set T1 Baseline
                           </button>
                           <button
                             type="button"
-                            onClick={() => { setLaterSceneId(scene._id); setActiveTab('slider'); }}
-                            className={`px-2 py-1 rounded text-[11px] font-semibold border ${
+                            onClick={() => {
+                              setLaterSceneId(scene._id);
+                              setActiveTab('slider');
+                            }}
+                            className={`px-2.5 py-1 rounded text-[11px] font-semibold border ${
                               laterSceneId === scene._id
                                 ? 'bg-emerald-700 text-white border-emerald-700'
                                 : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                             }`}
                           >
-                            Set T2
+                            Set T2 Current
                           </button>
                         </td>
                       </tr>
@@ -618,167 +582,331 @@ export default function Analysis() {
                 </table>
               </div>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Left 2 Cols: Before / After Split Slider or Vector Map */}
-              <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs flex flex-col">
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-                      {activeTab === 'slider' ? 'Multi-Temporal Visual Comparison' : 'Geospatial Anomaly Overlay Map'}
-                    </h2>
-                    <p className="text-xs text-slate-500">
-                      {activeTab === 'slider'
-                        ? 'Drag slider divider to inspect ground surface changes across time steps.'
-                        : 'Interactive vector rendering of monitoring boundary, protected reserves, and detected anomalies.'}
-                    </p>
+          ) : activeTab === 'map' ? (
+            /* GEOSPATIAL VECTOR & RASTER OVERLAY MAP VIEW (CHUNK 2) */
+            <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs flex flex-col space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                    <Compass className="w-4 h-4 text-emerald-700" />
+                    Georeferenced Map & Satellite Raster Overlay
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Interactive OpenStreetMap vector boundaries with real-world georeferenced satellite imagery and change mask projection.
+                  </p>
+                </div>
+
+                {/* Map Overlay Controls */}
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setMapOverlayType('mask')}
+                      className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all ${
+                        mapOverlayType === 'mask'
+                          ? 'bg-rose-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Change Mask Layer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMapOverlayType('scene')}
+                      className={`px-2.5 py-1 rounded text-[11px] font-semibold transition-all ${
+                        mapOverlayType === 'scene'
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      T2 Satellite Scene
+                    </button>
                   </div>
 
-                  {activeTab === 'slider' && (
-                    <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        id="toggle-change-mask"
-                        checked={showMask}
-                        onChange={(e) => setShowMask(e.target.checked)}
-                        className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4"
-                      />
-                      <span>Overlay Change Mask</span>
-                    </label>
+                  <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-600">
+                    <span>Opacity:</span>
+                    <input
+                      type="range"
+                      min="0.2"
+                      max="1"
+                      step="0.05"
+                      value={mapOverlayOpacity}
+                      onChange={(e) => setMapOverlayOpacity(parseFloat(e.target.value))}
+                      className="w-16 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                    />
+                    <span className="font-mono text-[10px] w-6">{Math.round(mapOverlayOpacity * 100)}%</span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowMapOverlay(!showMapOverlay)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border font-semibold transition-colors ${
+                      showMapOverlay
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-white text-slate-600 border-slate-300'
+                    }`}
+                  >
+                    {showMapOverlay ? <Eye className="w-3.5 h-3.5 text-emerald-700" /> : <EyeOff className="w-3.5 h-3.5" />}
+                    <span>{showMapOverlay ? 'Overlay Visible' : 'Overlay Hidden'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Geographic Bounds Status Pill */}
+              <div className="flex flex-wrap items-center justify-between text-xs px-3 py-2 rounded-lg bg-slate-50 border border-slate-200/80">
+                <div className="flex items-center gap-2 text-slate-700">
+                  <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+                  <span className="font-semibold">Geographic Raster Projection:</span>
+                  {leafletBounds ? (
+                    <span className="font-mono text-[11px] text-slate-600">
+                      SW [{leafletBounds[0][0].toFixed(3)}°N, {leafletBounds[0][1].toFixed(3)}°E] → NE [
+                      {leafletBounds[1][0].toFixed(3)}°N, {leafletBounds[1][1].toFixed(3)}°E]
+                    </span>
+                  ) : (
+                    <span className="text-amber-700 italic">No geographic bounding polygon registered</span>
                   )}
                 </div>
 
-                {activeTab === 'slider' ? (
-                  <div className="flex-1 flex flex-col">
-                    {/* Interactive Before/After Split Viewer */}
-                    <div
-                      id="interactive-comparison-viewer"
-                      className="relative w-full aspect-[4/3] rounded-lg overflow-hidden border border-slate-200 bg-slate-900 select-none"
-                    >
-                      {/* Background Image: Post-Event Scene (Later Scene) */}
-                      <img
-                        src={laterScene?.imageUrl || 'http://localhost:5000/assets/scenes/wg_2024.svg'}
-                        alt="Post-Event Satellite Scene"
-                        className="absolute inset-0 w-full h-full object-cover"
-                      />
-
-                      {/* Change Mask Highlight (if toggled) */}
-                      {showMask && analysis?.changeMaskUrl && (
-                        <img
-                          src={analysis.changeMaskUrl}
-                          alt="Change Detection Mask Overlay"
-                          className="absolute inset-0 w-full h-full object-cover mix-blend-screen pointer-events-none"
-                        />
-                      )}
-
-                      {/* Foreground Image: Baseline Scene (Clipped by sliderPosition) */}
-                      <div
-                        className="absolute inset-0 overflow-hidden"
-                        style={{ width: `${sliderPosition}%` }}
-                      >
-                        <img
-                          src={earlierScene?.imageUrl || 'http://localhost:5000/assets/scenes/wg_2023.svg'}
-                          alt="Baseline Satellite Scene"
-                          className="absolute inset-0 w-full h-full object-cover max-w-none"
-                          style={{ width: '100%', minWidth: '100%', height: '100%' }}
-                        />
-                        {/* Earlier Scene Badge */}
-                        <div className="absolute top-3 left-3 bg-black/75 backdrop-blur-xs text-white text-[10px] font-bold px-2 py-1 rounded">
-                          T1 BASELINE ({earlierScene?.acquisitionDate ? new Date(earlierScene.acquisitionDate).toISOString().slice(0, 10) : 'T1'})
-                        </div>
-                      </div>
-
-                      {/* Later Scene Badge */}
-                      <div className="absolute top-3 right-3 bg-emerald-950/80 backdrop-blur-xs text-emerald-300 text-[10px] font-bold px-2 py-1 rounded">
-                        T2 CURRENT ({laterScene?.acquisitionDate ? new Date(laterScene.acquisitionDate).toISOString().slice(0, 10) : 'T2'})
-                      </div>
-
-                      {/* Divider Line */}
-                      <div
-                        className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg pointer-events-none"
-                        style={{ left: `${sliderPosition}%` }}
-                      >
-                        <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-white shadow-md flex items-center justify-center text-slate-800">
-                          <Sliders className="w-4 h-4 rotate-90" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Slider Range Control */}
-                    <div className="mt-4 flex items-center gap-3">
-                      <span className="text-[11px] font-bold text-slate-600 uppercase">T1 Baseline</span>
-                      <input
-                        type="range"
-                        id="slider-control"
-                        min="0"
-                        max="100"
-                        value={sliderPosition}
-                        onChange={(e) => setSliderPosition(Number(e.target.value))}
-                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-ew-resize accent-emerald-600"
-                      />
-                      <span className="text-[11px] font-bold text-emerald-800 uppercase">T2 Post-Event</span>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 min-h-[420px]">
-                    <MapView
-                      center={currentArea?.centroid?.coordinates ? [currentArea.centroid.coordinates[1], currentArea.centroid.coordinates[0]] : [12.50, 75.70]}
-                      zoom={12}
-                      areas={currentArea ? [currentArea] : []}
-                      protectedZones={protectedZones}
-                      detectedRegions={analysis?.regions || []}
-                      height="420px"
-                    />
-                  </div>
+                {leafletBounds && (
+                  <span className="text-[11px] font-medium text-emerald-800">
+                    ✓ Valid Geographic Bounds Available
+                  </span>
                 )}
+              </div>
+
+              {/* Leaflet Map with ImageOverlay */}
+              <div className="flex-1 min-h-[480px]">
+                <MapView
+                  center={
+                    currentArea?.centroid?.coordinates
+                      ? [currentArea.centroid.coordinates[1], currentArea.centroid.coordinates[0]]
+                      : [12.5, 75.7]
+                  }
+                  zoom={12}
+                  areas={currentArea ? [currentArea] : []}
+                  protectedZones={protectedZones}
+                  detectedRegions={analysis?.regions || []}
+                  imageOverlayUrl={
+                    mapOverlayType === 'mask'
+                      ? analysis?.changeMaskUrl || 'http://localhost:5000/assets/scenes/wg_mask.svg'
+                      : laterScene?.imageUrl || 'http://localhost:5000/assets/scenes/wg_2024.svg'
+                  }
+                  imageOverlayBounds={geographicBounds}
+                  imageOverlayOpacity={mapOverlayOpacity}
+                  imageOverlayName={
+                    mapOverlayType === 'mask'
+                      ? 'Change Mask Anomaly Overlay'
+                      : 'Sentinel-2 Scene Overlay'
+                  }
+                  showImageOverlay={showMapOverlay}
+                  onToggleImageOverlay={setShowMapOverlay}
+                  height="480px"
+                />
+              </div>
+            </div>
+          ) : (
+            /* COMPARISON STUDIO: INTERACTIVE BEFORE/AFTER SLIDER (CHUNK 2 CORE) */
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left 2 Cols: Interactive Before/After Slider */}
+              <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs flex flex-col space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-emerald-700" />
+                      Multi-Temporal Visual Comparison Studio
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Drag divider between T1 baseline and T2 post-event passes. Toggle change-mask to highlight detected anomalies.
+                    </p>
+                  </div>
+
+                  <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                    <Sparkles className="w-3 h-3 text-emerald-600" />
+                    Touch & Drag Enabled
+                  </span>
+                </div>
+
+                {/* Interactive Slider Component */}
+                <BeforeAfterSlider
+                  beforeImage={
+                    earlierScene?.imageUrl || 'http://localhost:5000/assets/scenes/wg_2023.svg'
+                  }
+                  afterImage={
+                    laterScene?.imageUrl || 'http://localhost:5000/assets/scenes/wg_2024.svg'
+                  }
+                  beforeDate={earlierScene?.acquisitionDate}
+                  afterDate={laterScene?.acquisitionDate}
+                  beforeBadge={
+                    earlierScene?.source === 'SENTINEL_2'
+                      ? 'Verified Sentinel-2 RGB'
+                      : 'Prepared Demo Baseline'
+                  }
+                  afterBadge={
+                    laterScene?.source === 'SENTINEL_2'
+                      ? 'Verified Sentinel-2 RGB'
+                      : 'Prepared Demo Pass'
+                  }
+                  maskImage={
+                    analysis?.changeMaskUrl || 'http://localhost:5000/assets/scenes/wg_mask.svg'
+                  }
+                  showMask={showMask}
+                  onToggleMask={setShowMask}
+                  maskOpacity={maskOpacity}
+                  onMaskOpacityChange={setMaskOpacity}
+                />
+
+                {/* Provenance & Analysis Details Drawer (Chunk 2) */}
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <div
+                    onClick={() => setShowQualityDetails(!showQualityDetails)}
+                    className="flex items-center justify-between cursor-pointer py-1 text-xs font-bold text-slate-800 hover:text-emerald-800 transition-colors"
+                  >
+                    <span className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-slate-500" />
+                      Analysis Provenance, Multi-Temporal Dates & Quality Limitations
+                    </span>
+                    {showQualityDetails ? (
+                      <ChevronUp className="w-4 h-4 text-slate-500" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4 text-slate-500" />
+                    )}
+                  </div>
+
+                  {showQualityDetails && (
+                    <div className="mt-3 p-4 rounded-xl bg-slate-50 border border-slate-200/80 space-y-4 animate-in fade-in duration-150 text-xs">
+                      {/* Grid 1: Method & Elapsed Time */}
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div className="p-3 rounded-lg bg-white border border-slate-200">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                            Analysis Methodology
+                          </span>
+                          <span className="font-bold text-slate-900 mt-0.5 block">
+                            {analysis?.method === 'PREPARED_RESULT'
+                              ? 'Prepared Demo Dataset'
+                              : 'Pixel-Difference Spectral Index'}
+                          </span>
+                          <span className="text-[11px] text-slate-500 block mt-1">
+                            Pre-computed Sentinel-2 multi-band differential. Not a black-box AI model.
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-lg bg-white border border-slate-200">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                            Acquisition Interval
+                          </span>
+                          <span className="font-bold text-slate-900 mt-0.5 block">
+                            {elapsedDays !== null ? `${elapsedDays} Days Elapsed` : 'Baseline Interval'}
+                          </span>
+                          <span className="text-[11px] text-slate-500 block mt-1">
+                            {earlierScene?.acquisitionDate ? new Date(earlierScene.acquisitionDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'T1'} → {laterScene?.acquisitionDate ? new Date(laterScene.acquisitionDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'T2'}
+                          </span>
+                        </div>
+
+                        <div className="p-3 rounded-lg bg-white border border-slate-200">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                            Ground Resolution (GSD)
+                          </span>
+                          <span className="font-bold text-slate-900 mt-0.5 block">
+                            {earlierScene?.resolutionMeters || 10}m per ground pixel
+                          </span>
+                          <span className="text-[11px] text-slate-500 block mt-1">
+                            Sub-pixel features &lt; 100m² require on-site drone or field inspection.
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Grid 2: Quality Notes Checklist */}
+                      <div>
+                        <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider block mb-2 flex items-center gap-1.5">
+                          <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+                          Quality Assurance Notes & Geometric Alignment
+                        </span>
+                        <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-200">
+                          {analysis?.qualityNotes && analysis.qualityNotes.length > 0 ? (
+                            analysis.qualityNotes.map((note, idx) => (
+                              <div key={idx} className="flex items-start gap-2 text-slate-700">
+                                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                                <span>{note}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="text-slate-500 italic">
+                              Prepared Sentinel-2 demo analysis with cloud cover &lt; 5% and orthorectified alignment.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Regulatory Notice Banner */}
+                      <div className="p-3 rounded-lg bg-amber-50/80 border border-amber-200/80 text-amber-900 flex items-start gap-2.5">
+                        <AlertTriangle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                        <div className="text-[11px]">
+                          <strong>Verification Advisory:</strong> Multi-temporal imagery comparisons identify potential land disturbance. They do not prove illegal activity or conclusive boundary encroachment without authorized field officer verification.
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Right Col: Detected Regions & Inspection Tasks */}
               <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs flex flex-col">
                 <div className="flex items-center justify-between mb-2">
                   <h2 className="text-sm font-bold text-slate-900 tracking-tight">
-                    Detected Anomalies & Findings
+                    Flagged Anomalies & Regions
                   </h2>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700">
                     {analysis?.regions?.length || 0} Flagged
                   </span>
                 </div>
 
                 <p className="text-xs text-slate-500 mb-4">
-                  Ground verification required prior to enforcement action.
+                  Multi-temporal anomalies requiring field perimeter check.
                 </p>
 
                 {/* Analysis Summary Metric Box */}
                 {analysis ? (
-                  <div className="p-3.5 mb-4 rounded-lg bg-slate-50 border border-slate-200/80 text-xs space-y-1.5">
-                    <div className="flex justify-between">
+                  <div className="p-3.5 mb-4 rounded-lg bg-slate-50 border border-slate-200/80 text-xs space-y-2">
+                    <div className="flex justify-between items-center">
                       <span className="text-slate-500">Methodology:</span>
-                      <span className="font-semibold text-slate-800">{analysis.method}</span>
+                      <span className="font-semibold px-2 py-0.5 rounded bg-slate-200/70 text-slate-800 text-[11px]">
+                        {analysis.method}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Total Changed Area:</span>
-                      <span className="font-bold text-slate-900">{analysis.changedAreaHectares || 14.8} ha</span>
+                      <span className="font-bold text-slate-900">
+                        {analysis.changedAreaHectares || 14.8} ha ({analysis.changedAreaSqMeters?.toLocaleString() || '148,000'} m²)
+                      </span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Protected Overlap:</span>
-                      <span className="font-bold text-rose-600">
-                        {analysis.regions?.some(r => r.protectedZoneOverlap) ? 'Confirmed Overlap' : 'None Detected'}
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">Protected Reserve Status:</span>
+                      <span
+                        className={`font-bold text-[11px] px-2 py-0.5 rounded ${
+                          analysis.regions?.some((r) => r.protectedZoneOverlap)
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-emerald-100 text-emerald-800'
+                        }`}
+                      >
+                        {analysis.regions?.some((r) => r.protectedZoneOverlap)
+                          ? '⚠️ Core Reserve Overlap'
+                          : '✓ Outside Core Reserve'}
                       </span>
                     </div>
                   </div>
                 ) : (
-                  <div className="p-3 mb-4 rounded-lg bg-slate-50 text-slate-500 text-xs">
-                    No change analysis pre-calculated for this scene pair.
+                  <div className="p-3 mb-4 rounded-lg bg-slate-50 text-slate-500 text-xs text-center">
+                    Click "Compare Images" above to run or retrieve analysis.
                   </div>
                 )}
 
                 {/* Region Cards */}
-                <div className="space-y-3 flex-1 overflow-y-auto">
+                <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px]">
                   {analysis?.regions && analysis.regions.length > 0 ? (
                     analysis.regions.map((region) => (
                       <div
                         key={region.regionId}
-                        className="p-3.5 rounded-lg border border-slate-200 hover:border-slate-300 transition-all flex flex-col justify-between"
+                        className="p-3.5 rounded-lg border border-slate-200 hover:border-slate-300 transition-all flex flex-col justify-between bg-white"
                       >
                         <div>
                           <div className="flex items-center justify-between">
@@ -790,10 +918,17 @@ export default function Analysis() {
 
                           <div className="mt-2 text-xs text-slate-600 space-y-1">
                             <div>
-                              Estimated Area: <span className="font-semibold text-slate-800">{(region.areaSqMeters / 10000).toFixed(2)} ha</span> ({region.areaSqMeters?.toLocaleString()} m²)
+                              Estimated Extent:{' '}
+                              <span className="font-semibold text-slate-800">
+                                {(region.areaSqMeters / 10000).toFixed(2)} ha
+                              </span>{' '}
+                              ({region.areaSqMeters?.toLocaleString()} m²)
                             </div>
                             <div>
-                              Confidence: <span className="font-semibold text-slate-800">{Math.round((region.confidence || 0.85) * 100)}%</span>
+                              Confidence:{' '}
+                              <span className="font-semibold text-slate-800">
+                                {Math.round((region.confidence || 0.85) * 100)}%
+                              </span>
                             </div>
                           </div>
 
@@ -813,7 +948,7 @@ export default function Analysis() {
                             type="button"
                             id={`btn-create-task-${region.regionId.toLowerCase()}`}
                             onClick={() => handleOpenTaskModal(region)}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs shadow-xs transition-colors"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs shadow-xs transition-colors"
                           >
                             <ClipboardPlus className="w-3.5 h-3.5" />
                             <span>Create Task</span>
@@ -827,18 +962,6 @@ export default function Analysis() {
                     </div>
                   )}
                 </div>
-
-                {/* Quality Notes list */}
-                {analysis?.qualityNotes && analysis.qualityNotes.length > 0 && (
-                  <div className="mt-4 pt-4 border-t border-slate-100 text-[11px] text-slate-500 space-y-1">
-                    <span className="font-bold text-slate-700 block">Quality Notes & Provenance:</span>
-                    <ul className="list-disc list-inside space-y-0.5">
-                      {analysis.qualityNotes.map((note, idx) => (
-                        <li key={idx}>{note}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </div>
             </div>
           )}

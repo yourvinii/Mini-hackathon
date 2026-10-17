@@ -267,6 +267,76 @@ const seedDatabase = async () => {
     });
     console.log(`[Seed] Created prepared change analysis ${analysis._id}`);
 
+    const pulicatAnalysis = await ChangeAnalysis.create({
+      monitoringArea: areas[1]._id,
+      earlierScene: scenes[3]._id,
+      laterScene: scenes[4]._id,
+      method: 'PREPARED_RESULT',
+      status: 'COMPLETED',
+      changeMaskUrl: 'http://localhost:5000/assets/scenes/pulicat_mask.svg',
+      overlayUrl: 'http://localhost:5000/assets/scenes/pulicat_2024.svg',
+      changedAreaSqMeters: 85000,
+      changedAreaHectares: 8.5,
+      regions: [
+        {
+          regionId: 'REG-2024-003',
+          category: 'WATER_CHANGE',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [80.17, 13.52],
+                [80.21, 13.52],
+                [80.21, 13.56],
+                [80.17, 13.56],
+                [80.17, 13.52]
+              ]
+            ]
+          },
+          centroid: {
+            type: 'Point',
+            coordinates: [80.19, 13.54]
+          },
+          areaSqMeters: 52000,
+          confidence: 0.89,
+          protectedZoneOverlap: true,
+          reviewStatus: 'PENDING'
+        },
+        {
+          regionId: 'REG-2024-004',
+          category: 'NEW_CONSTRUCTION',
+          geometry: {
+            type: 'Polygon',
+            coordinates: [
+              [
+                [80.22, 13.53],
+                [80.24, 13.53],
+                [80.24, 13.55],
+                [80.22, 13.55],
+                [80.22, 13.53]
+              ]
+            ]
+          },
+          centroid: {
+            type: 'Point',
+            coordinates: [80.23, 13.54]
+          },
+          areaSqMeters: 33000,
+          confidence: 0.82,
+          protectedZoneOverlap: false,
+          reviewStatus: 'PENDING'
+        }
+      ],
+      qualityNotes: [
+        'Prepared demonstration dataset with pre-computed Sentinel-2 multi-spectral NDWI differential.',
+        'Cloud cover < 5% on both baseline (2023-01-10) and current (2024-01-15) passes.',
+        'Lagoon boundary change correlated with low seasonal tide and aquaculture bund expansion.',
+        'Ramsar wetland core zone intersection flagged for verification.'
+      ],
+      completedAt: new Date()
+    });
+    console.log(`[Seed] Created prepared change analysis for Pulicat ${pulicatAnalysis._id}`);
+
     // 5. Create Three Inspection Tasks in Different Statuses (OPEN, IN_PROGRESS, VERIFIED)
     const inspectionTasks = await InspectionTask.create([
       {

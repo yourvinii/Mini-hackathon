@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- Transparent overlay with change detection masks for Pulicat -->
+  <rect width="800" height="600" fill="none"/>
+  
+  <!-- Anomaly 1: Waterbody Retraction / Hydrologic Drydown (Cyan/Sky Blue dashed overlay) -->
+  <path d="M 120 0 L 220 50 L 230 420 L 150 400 Z" fill="#0284c7" fill-opacity="0.45" stroke="#38bdf8" stroke-width="3" stroke-dasharray="6,4"/>
+  <rect x="130" y="160" width="180" height="26" rx="4" fill="#0369a1" fill-opacity="0.9"/>
+  <text x="140" y="178" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#fff">REG-2024-003 (WATER CHANGE)</text>
+
+  <!-- Anomaly 2: Unauthorized Aquaculture Enclosures (Amber dashed overlay) -->
+  <rect x="240" y="310" width="160" height="125" rx="6" fill="#f59e0b" fill-opacity="0.35" stroke="#f59e0b" stroke-width="3" stroke-dasharray="6,4"/>
+  <rect x="250" y="280" width="180" height="26" rx="4" fill="#b45309" fill-opacity="0.9"/>
+  <text x="260" y="298" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#fff">REG-2024-004 (ENCROACHMENT)</text>
+</svg>
+
