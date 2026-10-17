@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   ClipboardCheck,
@@ -63,6 +63,8 @@ export default function Inspections() {
 
   // Selected task & local state
   const [activeTask, setActiveTask] = useState(null);
+  const activeTaskRef = useRef(null);
+  activeTaskRef.current = activeTask;
   const [notesDraft, setNotesDraft] = useState('');
   const [assignedToDraft, setAssignedToDraft] = useState('');
   const [updating, setUpdating] = useState(false);
@@ -117,7 +119,10 @@ export default function Inspections() {
 
       // Keep active task selection or pick first
       if (loadedTasks.length > 0) {
-        const stillSelected = activeTask ? loadedTasks.find((t) => t._id === activeTask._id) : null;
+        const currentActiveTask = activeTaskRef.current;
+        const stillSelected = currentActiveTask
+          ? loadedTasks.find((t) => t._id === currentActiveTask._id)
+          : null;
         const taskToSelect = stillSelected || loadedTasks[0];
         setActiveTask(taskToSelect);
         setNotesDraft(taskToSelect.inspectionNotes || '');
@@ -133,7 +138,7 @@ export default function Inspections() {
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, priorityFilter, activeTask]);
+  }, [statusFilter, priorityFilter]);
 
   useEffect(() => {
     fetchTasks();
@@ -157,7 +162,7 @@ export default function Inspections() {
       }
     };
     loadAux();
-  }, [createForm.areaId]);
+  }, []);
 
   const handleSelectTask = (task) => {
     setActiveTask(task);
@@ -187,13 +192,13 @@ export default function Inspections() {
     }
   };
 
-  const executeStatusUpdate = async (newStatus, reviewerName = null) => {
+  const executeStatusUpdate = async (newStatus, reviewerName = null, notesOverride = notesDraft) => {
     if (!activeTask) return;
     try {
       setUpdating(true);
       const payload = {
         status: newStatus,
-        inspectionNotes: notesDraft,
+        inspectionNotes: notesOverride,
         assignedTo: assignedToDraft
       };
       if (reviewerName) {
@@ -223,7 +228,7 @@ export default function Inspections() {
       : `[${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}] ${pendingReviewStatus} Decision: ${reviewForm.justification}`;
 
     setNotesDraft(fullNotes);
-    executeStatusUpdate(pendingReviewStatus, reviewerSignOff);
+    executeStatusUpdate(pendingReviewStatus, reviewerSignOff, fullNotes);
   };
 
   const handleSaveNotesAndInspector = async () => {
@@ -329,16 +334,18 @@ export default function Inspections() {
   };
 
   // Filter tasks locally by search query
-  const filteredTasks = tasks.filter((t) => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      t.title?.toLowerCase().includes(query) ||
-      t.regionId?.toLowerCase().includes(query) ||
-      t.monitoringArea?.name?.toLowerCase().includes(query) ||
-      t.assignedTo?.toLowerCase().includes(query)
+  const filteredTasks = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+
+    if (!query) return tasks;
+
+    return tasks.filter((task) =>
+      task.title?.toLowerCase().includes(query) ||
+      task.regionId?.toLowerCase().includes(query) ||
+      task.monitoringArea?.name?.toLowerCase().includes(query) ||
+      task.assignedTo?.toLowerCase().includes(query)
     );
-  });
+  }, [tasks, searchQuery]);
 
   return (
     <div className="space-y-6">
@@ -830,7 +837,7 @@ export default function Inspections() {
                   </label>
                   <select
                     value={createForm.areaId}
-                    onChange={(e) => setCreateForm({ ...createForm, areaId: e.target.value })}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, areaId: e.target.value }))}
                     className="w-full text-xs rounded-lg border border-slate-300 p-2 text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     {areas.map((a) => (
@@ -850,7 +857,7 @@ export default function Inspections() {
                     required
                     placeholder="e.g. REG-2024-001"
                     value={createForm.regionId}
-                    onChange={(e) => setCreateForm({ ...createForm, regionId: e.target.value })}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, regionId: e.target.value }))}
                     className="w-full text-xs rounded-lg border border-slate-300 p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
@@ -865,7 +872,7 @@ export default function Inspections() {
                   required
                   placeholder="e.g. Field perimeter check on suspected forest clearing"
                   value={createForm.title}
-                  onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, title: e.target.value }))}
                   className="w-full text-xs rounded-lg border border-slate-300 p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -878,7 +885,7 @@ export default function Inspections() {
                   rows={3}
                   placeholder="Outline field coordinates to verify, access routes, and boundary markers..."
                   value={createForm.description}
-                  onChange={(e) => setCreateForm({ ...createForm, description: e.target.value })}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, description: e.target.value }))}
                   className="w-full text-xs rounded-lg border border-slate-300 p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -890,7 +897,7 @@ export default function Inspections() {
                   </label>
                   <select
                     value={createForm.priority}
-                    onChange={(e) => setCreateForm({ ...createForm, priority: e.target.value })}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, priority: e.target.value }))}
                     className="w-full text-xs rounded-lg border border-slate-300 p-2 text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   >
                     <option value="HIGH">HIGH (Protected Reserve Overlap)</option>
@@ -906,7 +913,7 @@ export default function Inspections() {
                   <input
                     type="text"
                     value={createForm.assignedTo}
-                    onChange={(e) => setCreateForm({ ...createForm, assignedTo: e.target.value })}
+                    onChange={(e) => setCreateForm((prev) => ({ ...prev, assignedTo: e.target.value }))}
                     className="w-full text-xs rounded-lg border border-slate-300 p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                 </div>
@@ -968,7 +975,7 @@ export default function Inspections() {
                   type="text"
                   required
                   value={reviewForm.reviewerName}
-                  onChange={(e) => setReviewForm({ ...reviewForm, reviewerName: e.target.value })}
+                  onChange={(e) => setReviewForm((prev) => ({ ...prev, reviewerName: e.target.value }))}
                   className="w-full text-xs rounded-lg border border-slate-300 p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -981,7 +988,7 @@ export default function Inspections() {
                   type="text"
                   required
                   value={reviewForm.reviewerBadge}
-                  onChange={(e) => setReviewForm({ ...reviewForm, reviewerBadge: e.target.value })}
+                  onChange={(e) => setReviewForm((prev) => ({ ...prev, reviewerBadge: e.target.value }))}
                   className="w-full text-xs rounded-lg border border-slate-300 p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
@@ -994,7 +1001,7 @@ export default function Inspections() {
                   rows={3}
                   required
                   value={reviewForm.justification}
-                  onChange={(e) => setReviewForm({ ...reviewForm, justification: e.target.value })}
+                  onChange={(e) => setReviewForm((prev) => ({ ...prev, justification: e.target.value }))}
                   className="w-full text-xs rounded-lg border border-slate-300 p-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
               </div>
