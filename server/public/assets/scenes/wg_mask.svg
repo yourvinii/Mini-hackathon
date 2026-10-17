@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <!-- Transparent overlay with neon detection masks -->
+  <rect width="800" height="600" fill="none"/>
+  <!-- Anomaly 1: Vegetation Loss (Amber/Red fill with pulsing border) -->
+  <path d="M 480 120 Q 580 90 660 140 Q 690 220 620 250 Q 510 240 480 170 Z" fill="#ef4444" fill-opacity="0.45" stroke="#ef4444" stroke-width="3" stroke-dasharray="6,4"/>
+  <rect x="530" y="100" width="160" height="26" rx="4" fill="#991b1b" fill-opacity="0.85"/>
+  <text x="540" y="118" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#fff">REG-2024-001 (VEG LOSS)</text>
+
+  <!-- Anomaly 2: Built-up Expansion (Orange highlight) -->
+  <rect x="195" y="150" width="150" height="90" rx="4" fill="#f59e0b" fill-opacity="0.4" stroke="#f59e0b" stroke-width="3"/>
+  <rect x="200" y="125" width="175" height="24" rx="4" fill="#b45309" fill-opacity="0.85"/>
+  <text x="210" y="142" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#fff">REG-2024-002 (CONSTRUCTION)</text>
+</svg>
