@@ -5,12 +5,9 @@ import {
   Waves,
   AlertTriangle,
   Info,
-  MapPin,
   CheckCircle2,
-  Layers,
   Compass,
-  Eye,
-  Sliders
+  Eye
 } from 'lucide-react';
 import { getProtectedZones, getAnalyses, getAreas } from '../api';
 import StatusBadge from '../components/StatusBadge';

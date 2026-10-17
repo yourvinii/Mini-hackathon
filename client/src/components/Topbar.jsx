@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, ShieldAlert, User, Activity, ExternalLink } from 'lucide-react';
+import { Menu, Activity } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Topbar({ onToggleSidebar, activeArea = 'Western Ghats Sector 4' }) {

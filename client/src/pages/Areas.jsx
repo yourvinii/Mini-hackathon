@@ -2,14 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   MapPin,
-  Calendar,
   Layers,
   ArrowRight,
-  Shield,
-  Plus,
-  Compass,
-  CheckCircle2,
-  FileCheck
+  Plus
 } from 'lucide-react';
 import { getAreas, getProtectedZones, createArea } from '../api';
 import StatusBadge from '../components/StatusBadge';
