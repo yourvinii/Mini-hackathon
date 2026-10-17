@@ -52,5 +52,6 @@ export const getInspections = (params) => api.get('/inspections', { params });
 export const getInspection = (id) => api.get(`/inspections/${id}`);
 export const createInspection = (data) => api.post('/inspections', data);
 export const updateInspection = (id, data) => api.patch(`/inspections/${id}`, data);
+export const addInspectionEvidence = (id, data) => api.post(`/inspections/${id}/evidence`, data);
 
 export default api;

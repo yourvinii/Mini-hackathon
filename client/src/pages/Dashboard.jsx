@@ -7,7 +7,6 @@ import {
   ClipboardCheck,
   ArrowRight,
   AlertTriangle,
-  Clock,
   Sparkles,
   ChevronRight,
   Eye
@@ -126,6 +125,38 @@ export default function Dashboard() {
           badgeType="danger"
         />
       </div>
+
+      {/* Surface Urgent Inspection Tasks Banner (Chunk 5) */}
+      {data?.urgentTasks && data.urgentTasks.length > 0 && (
+        <div className="bg-rose-50/80 border border-rose-200 p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs animate-in fade-in duration-150">
+          <div className="flex items-start gap-3">
+            <div className="p-2 rounded-lg bg-rose-100 text-rose-800 shrink-0 mt-0.5">
+              <AlertTriangle className="w-5 h-5 text-rose-600" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-bold text-rose-950 uppercase tracking-wide">
+                  Urgent Ground Inspection Required ({data.urgentTasks.length} Active High-Priority Tasks)
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-200 text-rose-900">
+                  Buffer Zone Overlap
+                </span>
+              </div>
+              <p className="text-xs text-rose-800 mt-0.5">
+                {data.urgentTasks[0].title} — Assigned to <span className="font-semibold">{data.urgentTasks[0].assignedTo || 'Unassigned'}</span> in {data.urgentTasks[0].monitoringArea?.name}
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/inspections?priority=HIGH"
+            id="btn-dashboard-urgent-inspections"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-700 hover:bg-rose-800 text-white text-xs font-semibold shadow-xs shrink-0 transition-colors"
+          >
+            <span>Review Urgent Tasks</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      )}
 
       {/* Split Map Preview & Monitored Areas Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

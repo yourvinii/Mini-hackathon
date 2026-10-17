@@ -1081,10 +1081,28 @@ export default function Analysis() {
             </div>
 
             {taskSuccessMessage ? (
-              <div className="py-8 text-center space-y-2">
+              <div className="py-6 text-center space-y-3">
                 <CheckCircle2 className="w-10 h-10 text-emerald-600 mx-auto" />
-                <h4 className="text-sm font-bold text-slate-900">Task Dispatched</h4>
+                <h4 className="text-sm font-bold text-slate-900">Task Successfully Dispatched</h4>
                 <p className="text-xs text-slate-600">{taskSuccessMessage}</p>
+                <div className="pt-2 flex items-center justify-center gap-2">
+                  <a
+                    href="/inspections"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-700 text-white text-xs font-semibold hover:bg-emerald-800 transition-colors"
+                  >
+                    <span>Open Inspections Queue</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInspectModalOpen(false);
+                      setTaskSuccessMessage('');
+                    }}
+                    className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleCreateTask} className="mt-4 space-y-4">

@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="100%" height="100%">
+  <defs>
+    <linearGradient id="sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#bae6fd"/>
+      <stop offset="100%" stop-color="#f0f9ff"/>
+    </linearGradient>
+    <linearGradient id="grass" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#15803d"/>
+      <stop offset="100%" stop-color="#14532d"/>
+    </linearGradient>
+    <linearGradient id="concrete" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#94a3b8"/>
+      <stop offset="50%" stop-color="#cbd5e1"/>
+      <stop offset="100%" stop-color="#64748b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Sky & Forest -->
+  <rect x="0" y="0" width="600" height="220" fill="url(#sky)"/>
+  <rect x="0" y="220" width="600" height="180" fill="url(#grass)"/>
+
+  <!-- Distant Hills -->
+  <path d="M0 220 Q120 160 250 200 T500 170 T600 210 L600 240 L0 240 Z" fill="#166534" opacity="0.7"/>
+
+  <!-- Concrete Forest Department Boundary Pillar #42 -->
+  <!-- Base Mound -->
+  <ellipse cx="300" cy="340" rx="90" ry="25" fill="#475569" opacity="0.8"/>
+  <ellipse cx="300" cy="335" rx="80" ry="20" fill="#64748b"/>
+
+  <!-- Concrete Column -->
+  <polygon points="260,330 340,330 330,120 270,120" fill="url(#concrete)"/>
+  <!-- Pyramidal Top -->
+  <polygon points="270,120 330,120 300,85" fill="#e2e8f0"/>
+
+  <!-- Paint / Inscription on Pillar -->
+  <!-- Red Top Stripe -->
+  <polygon points="271,135 329,135 327,160 273,160" fill="#dc2626"/>
+
+  <!-- Official Engraving -->
+  <text x="282" y="195" fill="#0f172a" font-size="16" font-weight="bold" font-family="sans-serif">FD</text>
+  <text x="277" y="225" fill="#0f172a" font-size="14" font-weight="bold" font-family="sans-serif">SHOLA</text>
+  <text x="280" y="255" fill="#0f172a" font-size="18" font-weight="bold" font-family="sans-serif">#42</text>
+  <text x="278" y="280" fill="#047857" font-size="11" font-weight="bold" font-family="sans-serif">CORE</text>
+
+  <!-- Physical Inspection Marker Peg -->
+  <polygon points="380,360 390,360 385,310" fill="#f59e0b"/>
+  <rect x="375" y="295" width="20" height="15" fill="#f59e0b"/>
+  <text x="378" y="306" fill="#000000" font-size="9" font-weight="bold">GPS</text>
+
+  <!-- Watermark -->
+  <rect x="15" y="15" width="280" height="50" rx="6" fill="#0f172a" opacity="0.85"/>
+  <text x="25" y="33" fill="#38bdf8" font-size="11" font-weight="bold" font-family="monospace">FIELD PHOTO: EVIDENCE #EVD-082</text>
+  <text x="25" y="48" fill="#f8fafc" font-size="10" font-family="monospace">BOUNDARY PILLAR #42 SURVEY CHECK</text>
+</svg>
+

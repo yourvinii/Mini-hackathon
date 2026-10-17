@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400" width="100%" height="100%">
+  <defs>
+    <linearGradient id="body" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#334155"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#064e3b"/>
+      <stop offset="100%" stop-color="#022c22"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Handheld GNSS Device Context -->
+  <rect x="0" y="0" width="600" height="400" fill="#1e293b"/>
+
+  <!-- Rugged Handheld Receiver Shell -->
+  <rect x="100" y="25" width="400" height="350" rx="30" fill="url(#body)" stroke="#475569" stroke-width="4"/>
+
+  <!-- Top Antenna -->
+  <path d="M260 25 L260 5 L340 5 L340 25 Z" fill="#475569"/>
+
+  <!-- LCD Screen -->
+  <rect x="130" y="60" width="340" height="230" rx="10" fill="url(#screen)" stroke="#10b981" stroke-width="2"/>
+
+  <!-- Screen Content -->
+  <!-- Header Bar -->
+  <rect x="130" y="60" width="340" height="30" rx="10" fill="#047857"/>
+  <text x="145" y="80" fill="#ffffff" font-size="12" font-weight="bold" font-family="monospace">GNSS FIELD ROVER: SHOLA SURVEY</text>
+  <text x="410" y="80" fill="#34d399" font-size="11" font-weight="bold" font-family="monospace">14 SATS</text>
+
+  <!-- Coordinates Display -->
+  <text x="150" y="120" fill="#34d399" font-size="12" font-family="monospace">CURRENT WAYPOINT:</text>
+  <text x="150" y="145" fill="#ffffff" font-size="20" font-weight="bold" font-family="monospace">12° 29' 31.6" N</text>
+  <text x="150" y="172" fill="#ffffff" font-size="20" font-weight="bold" font-family="monospace">75° 42' 15.1" E</text>
+
+  <!-- Elevation & Accuracy -->
+  <rect x="145" y="190" width="310" height="1" fill="#059669"/>
+  <text x="150" y="212" fill="#a7f3d0" font-size="11" font-family="monospace">ELEVATION: 1,142 m MSL</text>
+  <text x="310" y="212" fill="#a7f3d0" font-size="11" font-family="monospace">ACCURACY: ±0.8 m</text>
+
+  <!-- Distance to Reserve Border -->
+  <rect x="145" y="225" width="310" height="50" rx="6" fill="#065f46" stroke="#059669"/>
+  <text x="155" y="245" fill="#fef08a" font-size="11" font-weight="bold" font-family="monospace">BOUNDARY STATUS:</text>
+  <text x="155" y="262" fill="#ffffff" font-size="13" font-weight="bold" font-family="monospace">INSIDE SANCTUARY BUFFER (+42m)</text>
+
+  <!-- Physical Buttons on Unit -->
+  <circle cx="200" cy="330" r="18" fill="#334155" stroke="#64748b" stroke-width="2"/>
+  <text x="194" y="334" fill="#94a3b8" font-size="10" font-weight="bold" font-family="sans-serif">ESC</text>
+
+  <circle cx="300" cy="330" r="22" fill="#059669" stroke="#10b981" stroke-width="2"/>
+  <text x="288" y="335" fill="#ffffff" font-size="12" font-weight="bold" font-family="sans-serif">LOG</text>
+
+  <circle cx="400" cy="330" r="18" fill="#334155" stroke="#64748b" stroke-width="2"/>
+  <text x="393" y="334" fill="#94a3b8" font-size="10" font-weight="bold" font-family="sans-serif">ENT</text>
+</svg>
+
