@@ -15,7 +15,7 @@ import { getAreas, getProtectedZones, createArea } from '../api';
 import StatusBadge from '../components/StatusBadge';
 import LoadingState from '../components/LoadingState';
 import ErrorMessage from '../components/ErrorMessage';
-import MapView from '../components/MapView';
+import MapView, { extractBoundsFromGeoJson } from '../components/MapView';
 
 export default function Areas() {
   const [areas, setAreas] = useState([]);
@@ -221,6 +221,7 @@ export default function Areas() {
             <MapView
               center={selectedArea?.centroid?.coordinates ? [selectedArea.centroid.coordinates[1], selectedArea.centroid.coordinates[0]] : [12.50, 75.70]}
               zoom={11}
+              bounds={selectedArea?.boundary ? extractBoundsFromGeoJson(selectedArea.boundary) : null}
               areas={selectedArea ? [selectedArea] : areas}
               protectedZones={protectedZones}
               height="460px"

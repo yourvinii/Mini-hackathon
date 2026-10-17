@@ -155,6 +155,8 @@ export default function Dashboard() {
               zoom={11}
               areas={areas}
               protectedZones={protectedZones}
+              detectedRegions={recentAnalyses?.[0]?.regions || []}
+              detectionDate={recentAnalyses?.[0]?.completedAt || recentAnalyses?.[0]?.createdAt}
               height="380px"
             />
           </div>

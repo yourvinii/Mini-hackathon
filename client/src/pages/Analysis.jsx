@@ -766,9 +766,11 @@ export default function Analysis() {
                       : [12.5, 75.7]
                   }
                   zoom={12}
+                  bounds={leafletBounds}
                   areas={currentArea ? [currentArea] : []}
                   protectedZones={protectedZones}
                   detectedRegions={analysis?.regions || []}
+                  detectionDate={laterScene?.acquisitionDate || analysis?.completedAt}
                   imageOverlayUrl={
                     mapOverlayType === 'mask'
                       ? analysis?.changeMaskUrl || 'http://localhost:5000/assets/scenes/wg_mask.svg'
