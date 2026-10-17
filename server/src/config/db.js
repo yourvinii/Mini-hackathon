@@ -5,6 +5,14 @@ const connectDB = async () => {
     const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/landwatch';
     const conn = await mongoose.connect(mongoUri);
     console.log(`[Database] MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
+
+    mongoose.connection.on('disconnected', () => {
+      console.warn('[Database] MongoDB disconnected.');
+    });
+
+    mongoose.connection.on('error', (err) => {
+      console.error('[Database] MongoDB connection error:', err.message);
+    });
   } catch (error) {
     console.error(`[Database Error] Could not connect to MongoDB: ${error.message}`);
     process.exit(1);
