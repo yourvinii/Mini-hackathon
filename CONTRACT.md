@@ -230,7 +230,70 @@ Teacher publishes an exam so students can begin taking attempts.
 
 ---
 
+### `PUT /api/exams/:id`
+Teacher edits an existing exam created by them.
+
+- **Auth Required**: `Bearer <teacher_token>` (Teacher only, must own exam)
+- **Request Body**:
+```json
+{
+  "title": "CS 101: Updated Fundamentals",
+  "description": "Updated exam description.",
+  "durationSeconds": 900,
+  "questions": [
+    {
+      "question": "Updated question text?",
+      "options": ["Option A", "Option B"],
+      "correctAnswer": 0
+    }
+  ]
+}
+```
+- **Response `200 OK`**:
+```json
+{
+  "message": "Exam updated successfully",
+  "exam": {
+    "_id": "6710ea12b598d1a1c8905678",
+    "title": "CS 101: Updated Fundamentals",
+    "description": "Updated exam description.",
+    "durationSeconds": 900,
+    "questions": [...]
+  }
+}
+```
+
+---
+
 ## 4. Student Attempts
+
+### `GET /api/attempts`
+Student views their own attempts; Teacher views all attempts for their exams.
+
+- **Auth Required**: `Bearer <token>`
+- **Response `200 OK`**:
+```json
+{
+  "attempts": [
+    {
+      "_id": "6710ea12b598d1a1c8909999",
+      "exam": {
+        "_id": "6710ea12b598d1a1c8905678",
+        "title": "CS 101: Fundamentals of Privacy & Computer Architecture",
+        "durationSeconds": 600,
+        "status": "PUBLISHED"
+      },
+      "status": "IN_PROGRESS",
+      "riskScore": 25,
+      "riskLevel": "MEDIUM",
+      "startedAt": "2026-10-17T12:05:00.000Z",
+      "deadlineAt": "2026-10-17T12:15:00.000Z"
+    }
+  ]
+}
+```
+
+---
 
 ### `POST /api/attempts`
 Student starts an exam attempt. Explicit camera consent is mandatory. Server assigns official countdown deadline.

@@ -70,9 +70,15 @@ export const getExam = (id) =>
 export const publishExam = (id) =>
   apiClient.patch(`/exams/${id}/publish`);
 
+export const updateExam = (id, examData) =>
+  apiClient.put(`/exams/${id}`, examData);
+
 // ==========================================
 // 4. Student Attempts
 // ==========================================
+export const getAttempts = () =>
+  apiClient.get('/attempts');
+
 export const createAttempt = ({ examId, cameraConsent }) =>
   apiClient.post('/attempts', { examId, cameraConsent });
 
@@ -108,8 +114,8 @@ export const getDetectionStats = () =>
 
 // Grouped namespace exports
 export const authApi = { login, getMe, setAuthToken, getAuthToken, clearAuthToken };
-export const examApi = { createExam, getExams, getExam, publishExam };
-export const attemptApi = { createAttempt, getAttempt, submitAttempt, recordEvents, getAttemptEvents };
+export const examApi = { createExam, getExams, getExam, publishExam, updateExam };
+export const attemptApi = { getAttempts, createAttempt, getAttempt, submitAttempt, recordEvents, getAttemptEvents };
 export const teacherApi = { getTeacherDashboard, getAttemptReview, reviewEvent, getDetectionStats };
 export const systemApi = { getHealth };
 

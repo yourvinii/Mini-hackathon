@@ -200,8 +200,78 @@ const runTests = async () => {
       }
       console.log(`   ✓ Event marked FALSE_ALARM. Previous Score: ${prevScore} -> Updated Score: ${patchReviewJson.attempt.riskScore}`);
 
+      // 13. Teacher Creates a New Draft Exam
+      console.log('13. Testing POST /api/exams (Teacher authoring new draft exam)...');
+      const createExamRes = await fetch(`${baseUrl}/exams`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${teacherToken}`,
+        },
+        body: JSON.stringify({
+          title: 'Chunk 1 Verification Quiz',
+          description: 'Testing exam creation & editing flow.',
+          durationSeconds: 900,
+          questions: [
+            {
+              question: 'Is client-side AI more privacy preserving than cloud streaming?',
+              options: ['Yes, absolutely', 'No', 'Makes no difference', 'Only on Sundays'],
+              correctAnswer: 0,
+            },
+          ],
+        }),
+      });
+      const createExamJson = await createExamRes.json();
+      if (createExamRes.status !== 201 || !createExamJson.exam?._id) {
+        throw new Error(`Teacher exam creation failed: ${JSON.stringify(createExamJson)}`);
+      }
+      const newExamId = createExamJson.exam._id;
+      console.log(`   ✓ Draft exam created (ID: ${newExamId})`);
+
+      // 14. Teacher Edits the Draft Exam (PUT /api/exams/:id)
+      console.log('14. Testing PUT /api/exams/:id (Teacher editing draft exam)...');
+      const updateExamRes = await fetch(`${baseUrl}/exams/${newExamId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${teacherToken}`,
+        },
+        body: JSON.stringify({
+          title: 'Chunk 1 Verification Quiz (Updated Title)',
+          durationSeconds: 1200,
+        }),
+      });
+      const updateExamJson = await updateExamRes.json();
+      if (updateExamRes.status !== 200 || updateExamJson.exam.title !== 'Chunk 1 Verification Quiz (Updated Title)') {
+        throw new Error(`Teacher exam update failed: ${JSON.stringify(updateExamJson)}`);
+      }
+      console.log('   ✓ Exam updated successfully');
+
+      // 15. Teacher Publishes the Exam
+      console.log('15. Testing PATCH /api/exams/:id/publish (Publishing exam)...');
+      const publishRes = await fetch(`${baseUrl}/exams/${newExamId}/publish`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${teacherToken}` },
+      });
+      const publishJson = await publishRes.json();
+      if (publishRes.status !== 200 || publishJson.exam.status !== 'PUBLISHED') {
+        throw new Error(`Exam publish failed: ${JSON.stringify(publishJson)}`);
+      }
+      console.log('   ✓ Exam published successfully');
+
+      // 16. Student Fetches Their Attempts List (GET /api/attempts)
+      console.log('16. Testing GET /api/attempts (Student retrieving their attempts)...');
+      const studentAttemptsRes = await fetch(`${baseUrl}/attempts`, {
+        headers: { Authorization: `Bearer ${studentToken}` },
+      });
+      const studentAttemptsJson = await studentAttemptsRes.json();
+      if (studentAttemptsRes.status !== 200 || !Array.isArray(studentAttemptsJson.attempts)) {
+        throw new Error(`Student attempts list failed: ${JSON.stringify(studentAttemptsJson)}`);
+      }
+      console.log(`   ✓ Student attempts list retrieved (${studentAttemptsJson.attempts.length} attempts found)`);
+
       console.log('\n======================================================');
-      console.log('🎉 ALL 12 CHUNK 0 VERIFICATION TESTS PASSED!');
+      console.log('🎉 ALL 16 VERIFICATION TESTS (CHUNK 0 + CHUNK 1) PASSED!');
       console.log('======================================================\n');
 
       server.close(async () => {

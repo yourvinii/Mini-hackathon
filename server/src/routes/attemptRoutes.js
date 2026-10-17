@@ -41,6 +41,32 @@ const getAuthorizedAttempt = async (attemptId, user) => {
   return { attempt, isStudentOwner, isTeacherOwner };
 };
 
+// GET /api/attempts — Student views own attempts, Teacher views attempts for their exams
+router.get('/', async (req, res, next) => {
+  try {
+    if (req.user.role === 'STUDENT') {
+      const attempts = await Attempt.find({ student: req.user._id })
+        .populate('exam', 'title durationSeconds status')
+        .sort({ startedAt: -1 });
+      return res.status(200).json({ attempts });
+    }
+
+    if (req.user.role === 'TEACHER') {
+      const teacherExams = await Exam.find({ createdBy: req.user._id }).select('_id');
+      const examIds = teacherExams.map(e => e._id);
+      const attempts = await Attempt.find({ exam: { $in: examIds } })
+        .populate('student', 'name email')
+        .populate('exam', 'title durationSeconds')
+        .sort({ startedAt: -1 });
+      return res.status(200).json({ attempts });
+    }
+
+    return res.status(200).json({ attempts: [] });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /api/attempts — Student starts an attempt
 router.post('/', requireStudent, validateCreateAttempt, async (req, res, next) => {
   try {
