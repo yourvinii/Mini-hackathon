@@ -253,13 +253,17 @@ All 4xx and 5xx errors return a consistent JSON structure:
   "areaId": "6710dae0815047f3b8909001",
   "earlierSceneId": "6710dae0815047f3b8909101",
   "laterSceneId": "6710dae0815047f3b8909102",
-  "method": "PREPARED_RESULT"
+  "method": "PIXEL_DIFFERENCE | PREPARED_RESULT",
+  "threshold": 28,
+  "forceRerun": false
 }
 ```
-- **Validation**:
+- **Validation & Pipeline Behavior**:
   - `areaId`, `earlierSceneId`, `laterSceneId` are required ObjectIds.
-  - Both scenes must belong to the specified area.
-  - Earlier and later scene IDs must differ and have distinct acquisition dates.
+  - Both scenes must belong to the specified area and have distinct acquisition dates.
+  - `method`: Optional, defaults to `PIXEL_DIFFERENCE`. Executes Python NumPy differential pipeline with thresholding and noise clustering. Falls back cleanly to `PREPARED_RESULT` on timeout or missing runtime dependencies.
+  - `threshold`: Optional float (1-255, default 28). Controls pixel delta sensitivity.
+  - `forceRerun`: Optional boolean. When true, bypasses cache and re-executes the live pipeline.
 
 ---
 

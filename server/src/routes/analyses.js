@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { body, param, query } = require('express-validator');
 const validate = require('../middleware/validate');
-const { ChangeAnalysis, SatelliteScene, MonitoringArea } = require('../models');
+const { ChangeAnalysis, SatelliteScene, MonitoringArea, ProtectedZone } = require('../models');
+const { runChangeDetectionPipeline } = require('../pipeline/changeDetector');
 
 // GET /api/analyses
 router.get(
@@ -66,11 +67,20 @@ router.post(
     body('earlierSceneId').isMongoId().withMessage('Valid earlierSceneId is required'),
     body('laterSceneId').isMongoId().withMessage('Valid laterSceneId is required'),
     body('method').optional().isIn(['PIXEL_DIFFERENCE', 'PREPARED_RESULT']).withMessage('Invalid analysis method'),
+    body('threshold').optional().isFloat({ min: 1, max: 255 }).withMessage('Threshold must be between 1 and 255'),
+    body('forceRerun').optional().isBoolean().withMessage('forceRerun must be a boolean'),
     validate
   ],
   async (req, res, next) => {
     try {
-      const { areaId, earlierSceneId, laterSceneId, method = 'PREPARED_RESULT' } = req.body;
+      const {
+        areaId,
+        earlierSceneId,
+        laterSceneId,
+        method = 'PIXEL_DIFFERENCE',
+        threshold = 28,
+        forceRerun = false
+      } = req.body;
 
       if (earlierSceneId === laterSceneId) {
         return res.status(400).json({
@@ -114,85 +124,52 @@ router.post(
         });
       }
 
-      // 1. Check if an analysis already exists for this scene pair
-      const existing = await ChangeAnalysis.findOne({
-        monitoringArea: areaId,
-        $or: [
-          { earlierScene: earlierSceneId, laterScene: laterSceneId },
-          { earlierScene: laterSceneId, laterScene: earlierSceneId }
-        ]
-      })
-        .populate('monitoringArea', 'name region boundary centroid')
-        .populate('earlierScene', 'acquisitionDate imageUrl cloudCoverPercent resolutionMeters source')
-        .populate('laterScene', 'acquisitionDate imageUrl cloudCoverPercent resolutionMeters source');
+      // Check if an existing analysis matches if not forced rerun
+      if (!forceRerun) {
+        const existing = await ChangeAnalysis.findOne({
+          monitoringArea: areaId,
+          method,
+          $or: [
+            { earlierScene: earlierSceneId, laterScene: laterSceneId },
+            { earlierScene: laterSceneId, laterScene: earlierSceneId }
+          ]
+        })
+          .populate('monitoringArea', 'name region boundary centroid')
+          .populate('earlierScene', 'acquisitionDate imageUrl cloudCoverPercent resolutionMeters source')
+          .populate('laterScene', 'acquisitionDate imageUrl cloudCoverPercent resolutionMeters source');
 
-      if (existing) {
-        return res.status(200).json({ analysis: existing });
+        if (existing) {
+          return res.status(200).json({ analysis: existing });
+        }
       }
 
-      // 2. Select appropriate demonstration mask and artifacts
-      const isPulicat = area.name.toLowerCase().includes('pulicat');
-      const maskUrl = isPulicat
-        ? 'http://localhost:5000/assets/scenes/pulicat_mask.svg'
-        : 'http://localhost:5000/assets/scenes/wg_mask.svg';
+      // Fetch protected zones for geometric intersection
+      const protectedZones = await ProtectedZone.find({}).lean();
 
-      const earlierDateStr = new Date(earlierScene.acquisitionDate).toISOString().slice(0, 10);
-      const laterDateStr = new Date(laterScene.acquisitionDate).toISOString().slice(0, 10);
+      // Execute Python pipeline with timeout and fallback
+      const pipelineResult = await runChangeDetectionPipeline({
+        area,
+        earlierScene,
+        laterScene,
+        method,
+        threshold: Number(threshold) || 28,
+        resolutionMeters: earlierScene.resolutionMeters || 10,
+        protectedZones
+      });
 
       const newAnalysis = await ChangeAnalysis.create({
         monitoringArea: areaId,
         earlierScene: earlierSceneId,
         laterScene: laterSceneId,
-        method: method || 'PREPARED_RESULT',
-        status: 'COMPLETED',
-        changeMaskUrl: maskUrl,
-        overlayUrl: laterScene.imageUrl,
-        changedAreaSqMeters: isPulicat ? 85000 : 148000,
-        changedAreaHectares: isPulicat ? 8.5 : 14.8,
-        regions: isPulicat
-          ? [
-              {
-                regionId: `REG-${Date.now().toString().slice(-4)}A`,
-                category: 'WATER_CHANGE',
-                areaSqMeters: 52000,
-                confidence: 0.89,
-                protectedZoneOverlap: true,
-                reviewStatus: 'PENDING'
-              },
-              {
-                regionId: `REG-${Date.now().toString().slice(-4)}B`,
-                category: 'NEW_CONSTRUCTION',
-                areaSqMeters: 33000,
-                confidence: 0.82,
-                protectedZoneOverlap: false,
-                reviewStatus: 'PENDING'
-              }
-            ]
-          : [
-              {
-                regionId: `REG-${Date.now().toString().slice(-4)}A`,
-                category: 'VEGETATION_LOSS',
-                areaSqMeters: 92000,
-                confidence: 0.91,
-                protectedZoneOverlap: true,
-                reviewStatus: 'PENDING'
-              },
-              {
-                regionId: `REG-${Date.now().toString().slice(-4)}B`,
-                category: 'NEW_CONSTRUCTION',
-                areaSqMeters: 56000,
-                confidence: 0.84,
-                protectedZoneOverlap: false,
-                reviewStatus: 'PENDING'
-              }
-            ],
-        qualityNotes: [
-          'Prepared demonstration analysis result with aligned multi-temporal Sentinel-2 imagery.',
-          `Baseline pass: ${earlierDateStr} (${earlierScene.source === 'SENTINEL_2' ? 'Sentinel-2 RGB' : 'Prepared Demo'}).`,
-          `Comparison pass: ${laterDateStr} (${laterScene.source === 'SENTINEL_2' ? 'Sentinel-2 RGB' : 'Prepared Demo'}).`,
-          'Ground sample resolution: 10m/pixel. Geometric alignment RMSE < 0.5px.'
-        ],
-        completedAt: new Date()
+        method: pipelineResult.method,
+        status: pipelineResult.status,
+        changeMaskUrl: pipelineResult.changeMaskUrl,
+        overlayUrl: pipelineResult.overlayUrl,
+        changedAreaSqMeters: pipelineResult.changedAreaSqMeters,
+        changedAreaHectares: pipelineResult.changedAreaHectares,
+        regions: pipelineResult.regions,
+        qualityNotes: pipelineResult.qualityNotes,
+        completedAt: pipelineResult.completedAt || new Date()
       });
 
       const populated = await ChangeAnalysis.findById(newAnalysis._id)

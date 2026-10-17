@@ -16,7 +16,9 @@ import {
   ChevronUp,
   FileText,
   ShieldCheck,
-  Check
+  Check,
+  Zap,
+  Activity
 } from 'lucide-react';
 import {
   getAreas,
@@ -47,11 +49,15 @@ export default function Analysis() {
   const [comparing, setComparing] = useState(false);
   const [error, setError] = useState(null);
 
-  // Chunk 2: View & Toggle States
+  // Chunk 2 & 3: View & Pipeline States
   const [showMask, setShowMask] = useState(true);
   const [maskOpacity, setMaskOpacity] = useState(0.85);
   const [activeTab, setActiveTab] = useState('slider'); // 'slider' | 'map' | 'scenes'
   const [showQualityDetails, setShowQualityDetails] = useState(true);
+
+  // Chunk 3: Pipeline Configuration
+  const [pipelineEngine, setPipelineEngine] = useState('PIXEL_DIFFERENCE'); // 'PIXEL_DIFFERENCE' | 'PREPARED_RESULT'
+  const [sensitivityThreshold, setSensitivityThreshold] = useState(28);
 
   // Map Overlay controls
   const [showMapOverlay, setShowMapOverlay] = useState(true);
@@ -165,8 +171,8 @@ export default function Analysis() {
     setLaterSceneId(temp);
   };
 
-  // Run or refresh image comparison
-  const handleRunComparison = async () => {
+  // Run or refresh image comparison via Chunk 3 live pipeline or prepared fallback
+  const handleRunComparison = async (forceRerun = true) => {
     if (!selectedAreaId || !earlierSceneId || !laterSceneId) return;
     if (earlierSceneId === laterSceneId) {
       alert('T1 Baseline and T2 Comparison must be distinct acquisition dates.');
@@ -180,7 +186,9 @@ export default function Analysis() {
         areaId: selectedAreaId,
         earlierSceneId,
         laterSceneId,
-        method: 'PREPARED_RESULT'
+        method: pipelineEngine,
+        threshold: sensitivityThreshold,
+        forceRerun
       });
 
       if (res.analysis) {
@@ -188,7 +196,7 @@ export default function Analysis() {
       }
     } catch (err) {
       console.error('Comparison execution failed:', err);
-      setError(err.message || 'Failed to compare satellite scenes.');
+      setError(err.message || 'Failed to execute change detection pipeline.');
     } finally {
       setComparing(false);
     }
@@ -278,11 +286,11 @@ export default function Analysis() {
                 Satellite Scene Catalog & Change Analysis
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                Chunk 2: Before/After Comparison
+                Chunk 3: Change-Detection Pipeline
               </span>
             </div>
             <p className="mt-1 text-xs text-slate-500">
-              Interactive multi-temporal before/after split slider, change-mask overlay, and georeferenced raster projection.
+              Automated image-difference processing using NumPy, spatial cluster detection, and reserve intersection verification.
             </p>
           </div>
 
@@ -383,7 +391,7 @@ export default function Analysis() {
                 </div>
               </div>
 
-              {/* Swap Dates & Compare Action Button */}
+              {/* Swap Dates & Action Button */}
               <div className="md:col-span-4 flex items-center justify-center gap-2">
                 <button
                   type="button"
@@ -399,19 +407,19 @@ export default function Analysis() {
                 <button
                   type="button"
                   id="btn-run-comparison"
-                  onClick={handleRunComparison}
+                  onClick={() => handleRunComparison(true)}
                   disabled={comparing || isSameSceneSelected || !earlierSceneId || !laterSceneId}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs hover:shadow-sm disabled:opacity-50 transition-all"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-xs hover:shadow-sm disabled:opacity-50 transition-all"
                 >
                   {comparing ? (
                     <>
                       <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      <span>Aligning Imagery...</span>
+                      <span>Computing Pixel Differences...</span>
                     </>
                   ) : (
                     <>
-                      <Sliders className="w-4 h-4" />
-                      <span>Compare Images</span>
+                      <Zap className="w-4 h-4 text-emerald-200" />
+                      <span>Run Change Pipeline</span>
                     </>
                   )}
                 </button>
@@ -446,6 +454,81 @@ export default function Analysis() {
                     ))}
                   </select>
                 </div>
+              </div>
+            </div>
+
+            {/* Chunk 3: Pipeline Options Bar (Method, Sensitivity, Fallback status) */}
+            <div className="mt-3 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Method Selector */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Pipeline Method:
+                  </span>
+                  <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] font-semibold">
+                    <button
+                      type="button"
+                      id="opt-method-pixel-diff"
+                      onClick={() => setPipelineEngine('PIXEL_DIFFERENCE')}
+                      className={`px-2.5 py-1 rounded-md transition-all ${
+                        pipelineEngine === 'PIXEL_DIFFERENCE'
+                          ? 'bg-emerald-700 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      ⚡ NumPy Pixel Difference
+                    </button>
+                    <button
+                      type="button"
+                      id="opt-method-prepared"
+                      onClick={() => setPipelineEngine('PREPARED_RESULT')}
+                      className={`px-2.5 py-1 rounded-md transition-all ${
+                        pipelineEngine === 'PREPARED_RESULT'
+                          ? 'bg-slate-800 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      📁 Prepared Demo Result
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sensitivity Threshold (Active when PIXEL_DIFFERENCE selected) */}
+                {pipelineEngine === 'PIXEL_DIFFERENCE' && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                      Sensitivity:
+                    </span>
+                    <select
+                      value={sensitivityThreshold}
+                      onChange={(e) => setSensitivityThreshold(Number(e.target.value))}
+                      className="text-[11px] font-semibold rounded-md border border-slate-300 bg-white px-2 py-1 text-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    >
+                      <option value={20}>High Sensitivity (Threshold 20)</option>
+                      <option value={28}>Standard Balanced (Threshold 28)</option>
+                      <option value={38}>Conservative / Low (Threshold 38)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Status Indicator */}
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                {comparing ? (
+                  <span className="text-emerald-700 font-semibold animate-pulse flex items-center gap-1">
+                    <Activity className="w-3.5 h-3.5 animate-spin" />
+                    Executing NumPy differential pipeline...
+                  </span>
+                ) : analysis?.method === 'PIXEL_DIFFERENCE' ? (
+                  <span className="text-teal-700 font-medium flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-teal-600" />
+                    Active: Live differential calculation
+                  </span>
+                ) : (
+                  <span className="text-slate-500 italic">
+                    Active: Prepared demonstration analysis
+                  </span>
+                )}
               </div>
             </div>
 
@@ -583,7 +666,7 @@ export default function Analysis() {
               </div>
             </div>
           ) : activeTab === 'map' ? (
-            /* GEOSPATIAL VECTOR & RASTER OVERLAY MAP VIEW (CHUNK 2) */
+            /* GEOSPATIAL VECTOR & RASTER OVERLAY MAP VIEW */
             <div className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs flex flex-col space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
@@ -689,7 +772,7 @@ export default function Analysis() {
                   imageOverlayUrl={
                     mapOverlayType === 'mask'
                       ? analysis?.changeMaskUrl || 'http://localhost:5000/assets/scenes/wg_mask.svg'
-                      : laterScene?.imageUrl || 'http://localhost:5000/assets/scenes/wg_2024.svg'
+                      : laterScene?.imageUrl || 'http://localhost:5000/assets/scenes/wg_2024.png'
                   }
                   imageOverlayBounds={geographicBounds}
                   imageOverlayOpacity={mapOverlayOpacity}
@@ -705,7 +788,7 @@ export default function Analysis() {
               </div>
             </div>
           ) : (
-            /* COMPARISON STUDIO: INTERACTIVE BEFORE/AFTER SLIDER (CHUNK 2 CORE) */
+            /* COMPARISON STUDIO: INTERACTIVE BEFORE/AFTER SLIDER */
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left 2 Cols: Interactive Before/After Slider */}
               <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs flex flex-col space-y-4">
@@ -729,10 +812,10 @@ export default function Analysis() {
                 {/* Interactive Slider Component */}
                 <BeforeAfterSlider
                   beforeImage={
-                    earlierScene?.imageUrl || 'http://localhost:5000/assets/scenes/wg_2023.svg'
+                    earlierScene?.imageUrl || 'http://localhost:5000/assets/scenes/wg_2023.png'
                   }
                   afterImage={
-                    laterScene?.imageUrl || 'http://localhost:5000/assets/scenes/wg_2024.svg'
+                    laterScene?.imageUrl || 'http://localhost:5000/assets/scenes/wg_2024.png'
                   }
                   beforeDate={earlierScene?.acquisitionDate}
                   afterDate={laterScene?.acquisitionDate}
@@ -755,7 +838,7 @@ export default function Analysis() {
                   onMaskOpacityChange={setMaskOpacity}
                 />
 
-                {/* Provenance & Analysis Details Drawer (Chunk 2) */}
+                {/* Provenance & Analysis Details Drawer (Chunk 3 Enhanced) */}
                 <div className="mt-4 pt-4 border-t border-slate-100">
                   <div
                     onClick={() => setShowQualityDetails(!showQualityDetails)}
@@ -763,7 +846,7 @@ export default function Analysis() {
                   >
                     <span className="flex items-center gap-2">
                       <FileText className="w-4 h-4 text-slate-500" />
-                      Analysis Provenance, Multi-Temporal Dates & Quality Limitations
+                      Analysis Provenance, Multi-Temporal Dates & Pipeline Limitations
                     </span>
                     {showQualityDetails ? (
                       <ChevronUp className="w-4 h-4 text-slate-500" />
@@ -780,13 +863,23 @@ export default function Analysis() {
                           <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
                             Analysis Methodology
                           </span>
-                          <span className="font-bold text-slate-900 mt-0.5 block">
-                            {analysis?.method === 'PREPARED_RESULT'
-                              ? 'Prepared Demo Dataset'
-                              : 'Pixel-Difference Spectral Index'}
+                          <span className="font-bold text-slate-900 mt-0.5 block flex items-center gap-1.5">
+                            {analysis?.method === 'PIXEL_DIFFERENCE' ? (
+                              <>
+                                <Zap className="w-3.5 h-3.5 text-teal-600" />
+                                <span>NumPy Differential Pipeline</span>
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                                <span>Prepared Demo Dataset</span>
+                              </>
+                            )}
                           </span>
                           <span className="text-[11px] text-slate-500 block mt-1">
-                            Pre-computed Sentinel-2 multi-band differential. Not a black-box AI model.
+                            {analysis?.method === 'PIXEL_DIFFERENCE'
+                              ? 'Computed live via Euclidean RGB difference & noise clustering.'
+                              : 'Pre-computed multi-band index from verified Sentinel-2 passes.'}
                           </span>
                         </div>
 
@@ -810,7 +903,7 @@ export default function Analysis() {
                             {earlierScene?.resolutionMeters || 10}m per ground pixel
                           </span>
                           <span className="text-[11px] text-slate-500 block mt-1">
-                            Sub-pixel features &lt; 100m² require on-site drone or field inspection.
+                            Spatial scale: 1 pixel represents {((earlierScene?.resolutionMeters || 10) ** 2)} m² on the surface.
                           </span>
                         </div>
                       </div>
@@ -819,7 +912,7 @@ export default function Analysis() {
                       <div>
                         <span className="font-bold text-slate-800 text-[11px] uppercase tracking-wider block mb-2 flex items-center gap-1.5">
                           <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
-                          Quality Assurance Notes & Geometric Alignment
+                          Quality Assurance Notes & Pipeline Execution Parameters
                         </span>
                         <div className="space-y-1.5 bg-white p-3 rounded-lg border border-slate-200">
                           {analysis?.qualityNotes && analysis.qualityNotes.length > 0 ? (
@@ -831,7 +924,7 @@ export default function Analysis() {
                             ))
                           ) : (
                             <div className="text-slate-500 italic">
-                              Prepared Sentinel-2 demo analysis with cloud cover &lt; 5% and orthorectified alignment.
+                              Orthorectified Sentinel-2 multi-temporal alignment with cloud cover &lt; 5%.
                             </div>
                           )}
                         </div>
@@ -876,7 +969,7 @@ export default function Analysis() {
                     <div className="flex justify-between">
                       <span className="text-slate-500">Total Changed Area:</span>
                       <span className="font-bold text-slate-900">
-                        {analysis.changedAreaHectares || 14.8} ha ({analysis.changedAreaSqMeters?.toLocaleString() || '148,000'} m²)
+                        {analysis.changedAreaHectares} ha ({analysis.changedAreaSqMeters?.toLocaleString()} m²)
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
@@ -896,7 +989,7 @@ export default function Analysis() {
                   </div>
                 ) : (
                   <div className="p-3 mb-4 rounded-lg bg-slate-50 text-slate-500 text-xs text-center">
-                    Click "Compare Images" above to run or retrieve analysis.
+                    Click "Run Change Pipeline" above to run or retrieve analysis.
                   </div>
                 )}
 
